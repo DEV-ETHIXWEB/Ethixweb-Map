@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#F3EBDD" />
+  <title>Ethixweb · Client Map</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23C1272D'/><rect x='8' y='8' width='16' height='3.2' rx='1' fill='%23FFFDF9'/><rect x='8' y='14.4' width='16' height='3.2' rx='1' fill='%23FFFDF9'/><rect x='8' y='20.8' width='16' height='3.2' rx='1' fill='%23FFFDF9'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,100,400&display=swap" rel="stylesheet" />
+  <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet" />
+  <link href="styles.css" rel="stylesheet" />
+</head>
+<body>
+  <!-- Shared gradients for the clay map pins -->
+  <svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs>
+      <radialGradient id="pin-red" cx="34%" cy="26%" r="80%">
+        <stop offset="0" stop-color="#EE6A6E" />
+        <stop offset="0.45" stop-color="#C1272D" />
+        <stop offset="1" stop-color="#7E151A" />
+      </radialGradient>
+      <radialGradient id="pin-ink" cx="34%" cy="26%" r="80%">
+        <stop offset="0" stop-color="#5A504A" />
+        <stop offset="0.45" stop-color="#1B1512" />
+        <stop offset="1" stop-color="#000000" />
+      </radialGradient>
+      <radialGradient id="pin-cream" cx="34%" cy="26%" r="80%">
+        <stop offset="0" stop-color="#FFFFFF" />
+        <stop offset="1" stop-color="#E6D9C2" />
+      </radialGradient>
+    </defs>
+  </svg>
+
+  <div id="map" aria-label="World map of Ethixweb clients"></div>
+
+  <!-- Top bar -->
+  <header class="topbar glass">
+    <button class="brand clay" id="btn-brand" title="Back to the world view">
+      <img src="assets/ethixweb-logo.png" alt="Ethixweb" width="1400" height="209" />
+    </button>
+    <div class="topbar-name">
+      <span class="topbar-title">Client Map</span>
+      <span class="topbar-sub" id="topbar-sub">Loading…</span>
+    </div>
+
+    <label class="search clay-inset desktop-only">
+      <span data-icon="search"></span>
+      <input class="filter-input" type="search" placeholder="Search clients, industries or places" autocomplete="off" />
+      <kbd>/</kbd>
+    </label>
+
+    <div class="stats">
+      <div class="stat clay"><b id="stat-clients">0</b><span>Clients</span></div>
+      <div class="stat clay"><b id="stat-cities">0</b><span>Cities</span></div>
+      <div class="stat clay"><b id="stat-countries">0</b><span>Countries</span></div>
+    </div>
+
+    <button class="btn btn-red" id="btn-add"><span data-icon="plus"></span><span class="btn-label">Add client</span></button>
+  </header>
+
+  <!-- Client list -->
+  <aside class="panel glass" id="panel">
+    <button class="sheet-grip" id="sheet-grip" aria-label="Show or hide the client list"><span></span></button>
+    <div class="panel-head">
+      <h2>Clients <span class="count" id="list-count">0</span></h2>
+      <button class="icon-btn clay" id="btn-collapse" title="Hide list" aria-label="Hide list"><span data-icon="chevronLeft"></span></button>
+    </div>
+    <label class="search clay-inset mobile-only">
+      <span data-icon="search"></span>
+      <input class="filter-input" type="search" placeholder="Search clients or places" autocomplete="off" />
+    </label>
+
+    <ul class="client-list" id="client-list"></ul>
+
+    <div class="empty" id="empty" hidden>
+      <div class="empty-pin" aria-hidden="true">
+        <svg viewBox="0 0 40 52"><path d="M20 50.5c-1 0-1.9-.6-2.6-1.6L6.6 33A18.5 18.5 0 1 1 33.4 33L22.6 48.9c-.7 1-1.6 1.6-2.6 1.6z" fill="url(#pin-red)"/><circle cx="20" cy="19.5" r="7" fill="url(#pin-cream)"/></svg>
+      </div>
+      <h3>No clients yet</h3>
+      <p>Add a client and their pin will appear on the map.</p>
+      <button class="btn btn-red" id="btn-add-empty"><span data-icon="plus"></span>Add the first client</button>
+    </div>
+
+    <footer class="panel-foot">
+      <span>Backup</span>
+      <button class="link-btn" id="btn-export"><span data-icon="download"></span>Export</button>
+      <button class="link-btn" id="btn-import"><span data-icon="upload"></span>Import</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden />
+    </footer>
+  </aside>
+
+  <button class="reopen btn btn-cream" id="btn-reopen" hidden><span data-icon="list"></span>Clients</button>
+
+  <!-- Map controls -->
+  <div class="controls">
+    <div class="ctrl-group clay">
+      <button id="btn-zoom-in" title="Zoom in" aria-label="Zoom in"><span data-icon="plus"></span></button>
+      <button id="btn-zoom-out" title="Zoom out" aria-label="Zoom out"><span data-icon="minus"></span></button>
+    </div>
+    <div class="ctrl-group clay">
+      <button id="btn-view" title="Switch to globe" aria-label="Switch between flat map and globe"><span data-icon="globe"></span></button>
+      <button id="btn-labels" class="on" title="Hide place names and roads" aria-label="Toggle place names and roads"><span data-icon="labels"></span></button>
+      <button id="btn-north" title="Reset rotation" aria-label="Reset rotation"><span data-icon="compass"></span></button>
+    </div>
+    <div class="ctrl-group clay">
+      <button id="btn-fit" title="Zoom to all clients" aria-label="Zoom to all clients"><span data-icon="fit"></span></button>
+      <button id="btn-world" title="Whole world" aria-label="Show the whole world"><span data-icon="world"></span></button>
+    </div>
+  </div>
+
+  <!-- Add / edit sheet -->
+  <section class="sheet clay-sheet" id="sheet" aria-hidden="true" aria-labelledby="sheet-title">
+    <div class="sheet-head">
+      <div>
+        <span class="eyebrow" id="sheet-eyebrow">New client</span>
+        <h2 id="sheet-title">Add a client</h2>
+      </div>
+      <button class="icon-btn clay" id="sheet-close" aria-label="Close"><span data-icon="close"></span></button>
+    </div>
+
+    <form id="client-form" autocomplete="off" novalidate>
+      <label class="field">
+        <span class="field-label">Company name <em>required</em></span>
+        <input id="f-company" class="clay-inset" maxlength="80" placeholder="e.g. All Phase Plumbing" />
+      </label>
+
+      <div class="field">
+        <span class="field-label">Location <em>required</em></span>
+        <div class="loc-search">
+          <span data-icon="search"></span>
+          <input id="f-loc" class="clay-inset" placeholder="Street address, city or area" />
+          <span class="spinner" id="loc-spinner" hidden></span>
+        </div>
+        <ul class="loc-results" id="loc-results" hidden></ul>
+        <div class="loc-selected" id="loc-selected" hidden></div>
+        <button type="button" class="link-btn" id="btn-pick"><span data-icon="crosshair"></span>Or click the spot on the map</button>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Contact person</span>
+        <input id="f-client" class="clay-inset" maxlength="80" placeholder="Name of the person you work with" />
+      </label>
+
+      <div class="row">
+        <label class="field">
+          <span class="field-label">Industry</span>
+          <input id="f-industry" class="clay-inset" maxlength="40" placeholder="e.g. Plumbing" />
+        </label>
+        <label class="field">
+          <span class="field-label">Client since</span>
+          <input id="f-since" class="clay-inset" maxlength="20" placeholder="e.g. 2024" />
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="field">
+          <span class="field-label">Website</span>
+          <input id="f-website" class="clay-inset" maxlength="200" placeholder="company.com" />
+        </label>
+        <label class="field">
+          <span class="field-label">Phone</span>
+          <input id="f-phone" class="clay-inset" maxlength="40" placeholder="(206) 555-0100" />
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Notes</span>
+        <textarea id="f-notes" class="clay-inset" rows="3" maxlength="400" placeholder="Services, project details, anything worth remembering"></textarea>
+      </label>
+
+      <label class="switch">
+        <input type="checkbox" id="f-hq" />
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-text"><b>Ethixweb office</b><small>Shows a black pin with lines to every client</small></span>
+      </label>
+    </form>
+
+    <div class="sheet-foot">
+      <button type="button" class="btn btn-cream" id="btn-cancel">Cancel</button>
+      <button type="submit" form="client-form" class="btn btn-red" id="btn-save">Save client</button>
+    </div>
+  </section>
+
+  <!-- Pick-on-map hint -->
+  <div class="pick-hint glass" id="pick-hint" hidden>
+    <span data-icon="crosshair"></span>
+    <span>Click the client's location on the map</span>
+    <button class="btn btn-cream btn-sm" id="btn-pick-cancel">Cancel</button>
+  </div>
+
+  <!-- Dialog -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-card clay-sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title"></h3>
+      <p id="modal-text"></p>
+      <div class="modal-actions" id="modal-actions"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="data/clients.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
