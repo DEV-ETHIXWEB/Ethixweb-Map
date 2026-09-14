@@ -97,6 +97,9 @@
     } catch { /* storage unavailable: use the shipped list */ }
 
     const shipped = (Array.isArray(SHIPPED) ? SHIPPED : []).filter(isValidClient);
+    // Logos are site files, so always use the shipped path (it changes if the site is reorganised)
+    const shippedLogo = new Map(shipped.filter((c) => c.logo).map((c) => [c.id, c.logo]));
+    clients = clients.map((c) => (shippedLogo.has(c.id) && c.logo !== shippedLogo.get(c.id) ? { ...c, logo: shippedLogo.get(c.id) } : c));
     const known = new Set(clients.map((c) => c.id));
     const fresh = shipped.filter((c) => !seeded.includes(c.id) && !known.has(c.id));
     if (fresh.length) {
@@ -150,7 +153,8 @@
     }
   }
   // Logos may come from imported files, so only allow local assets or https images
-  const safeImg = (u) => (typeof u === "string" && /^(assets\/|\.{1,2}\/|https:\/\/)[^\s"'<>]+$/i.test(u) ? u : "");
+  const safeImg = (u) =>
+    typeof u === "string" && (/^https:\/\/[^\s"'<>]+$/i.test(u) || /^(?!\/\/)[\w.\/-]+\.(png|jpe?g|webp|svg|gif)$/i.test(u)) ? u : "";
   const prettyUrl = (u) => u.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
 
   let toastTimer;

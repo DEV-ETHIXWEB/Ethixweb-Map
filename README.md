@@ -1,11 +1,13 @@
-# Ethixweb Client Map
+# Ethixweb Map
 
 A map of businesses on real satellite imagery. Each business gets a pin on its exact address, and its city boundary is highlighted. The same code runs two editions:
 
 | Edition | Address | What it shows |
 |---|---|---|
-| **Ethixweb** | `/` | Ethixweb's clients, in Ethixweb red, cream and black |
-| **Spartan Management Group** | `/spartan/` | Spartan Management Group's 13 businesses and its headquarters, in Spartan blue and helmet red, grouped as on [spartanmg.net/locations](https://www.spartanmg.net/locations) |
+| **Spartan Management Group** | [ethixweb-map.vercel.app](https://ethixweb-map.vercel.app/) | Spartan Management Group's 13 businesses and headquarters, in Spartan blue and helmet red, grouped as on [spartanmg.net/locations](https://www.spartanmg.net/locations) |
+| **Ethixweb** | [ethixweb-map.vercel.app/ethixweb/](https://ethixweb-map.vercel.app/ethixweb/) | Ethixweb's clients, in Ethixweb red, cream and black |
+
+The old `/spartan/` address redirects to the home page.
 
 ## Run it
 
@@ -14,7 +16,7 @@ cd EthixwebMap
 python3 -m http.server 5173
 ```
 
-Then open http://localhost:5173 (Ethixweb) or http://localhost:5173/spartan/ (Spartan). You need an internet connection for the imagery and place search.
+Then open http://localhost:5173 (Spartan) or http://localhost:5173/ethixweb/ (Ethixweb). You need an internet connection for the imagery and place search.
 
 ## Using it
 
@@ -32,18 +34,21 @@ Each edition saves its changes separately in the browser, so editing one never a
 
 | File | What it is |
 |---|---|
-| `index.html` | Ethixweb edition page |
-| `styles.css` | Shared design (glass and clay surfaces). Colours are theme variables at the top |
 | `app.js` | Shared map, pins, search, add, edit and remove. Edition settings come from `window.MAP_CONFIG` |
-| `data/clients.js` | Ethixweb's client list |
-| `assets/` | Ethixweb logo, favicons and share image |
-| `site.webmanifest` | Ethixweb "Add to Home Screen" details |
-| `spartan/index.html` | Spartan edition page, including its settings (wording, sections, colours) |
+| `styles.css` | Shared design (glass and clay surfaces). Colours are theme variables at the top |
+| `index.html` | Spartan edition page (home), including its settings: wording, sections, colours |
+| `favicon.ico`, `site.webmanifest` | Spartan tab icon fallback and "Add to Home Screen" details |
 | `spartan/theme.css` | Spartan colours and Poppins font |
 | `spartan/data/businesses.js` | Spartan businesses: names and descriptions from spartanmg.net; addresses and phones from each business's own website; coordinates from Esri, US Census and OpenStreetMap address matches |
 | `spartan/assets/` | Spartan logo, business logos, favicons and share image |
+| `spartan/index.html` | Redirect from the old `/spartan/` address |
+| `ethixweb/index.html` | Ethixweb edition page |
+| `ethixweb/data/clients.js` | Ethixweb's client list |
+| `ethixweb/assets/` | Ethixweb logo, favicons and share image |
+| `ethixweb/source/` | Original logo and share-image files |
+| `vercel.json` | Adds the trailing slash to folder addresses (`/ethixweb` → `/ethixweb/`) |
 
-A new entry added to a data file shows up for everyone the next time they open that edition. When you change the page layout, update both `index.html` and `spartan/index.html`; the two bodies match apart from wording and logo.
+A new entry added to a data file shows up for everyone the next time they open that edition. When you change the page layout, update both `index.html` and `ethixweb/index.html`; the two bodies match apart from wording and logo.
 
 ## Data sources
 
