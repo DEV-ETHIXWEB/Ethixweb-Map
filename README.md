@@ -18,6 +18,7 @@ Then open http://localhost:5173. You need an internet connection for the imagery
 - **Search** (press `/`) filters the list and the map by company, industry, contact or place.
 - **Map controls** (bottom right): zoom, globe or flat map, place names and roads on or off, reset rotation, zoom to all clients, and whole world.
 - **Ethixweb office**: switch this on for one entry to show it as a black pin with dashed lines to every client.
+- **Sound and haptics**: buttons, pins and actions give a soft click and, on phones, a light vibration. The speaker button in the map controls turns both off, and the choice is remembered. Sounds are generated in the browser, so there are no audio files. Haptics use the vibration API on Android and the native switch tap on iPhone (iOS 18 and later).
 - **Backup** (bottom of the list): Export downloads a JSON file and Import loads one back, either added to the map or replacing it.
 
 ## Files

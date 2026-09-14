@@ -103,6 +103,7 @@
       <button id="btn-view" title="Switch to globe" aria-label="Switch between flat map and globe"><span data-icon="globe"></span></button>
       <button id="btn-labels" class="on" title="Hide place names and roads" aria-label="Toggle place names and roads"><span data-icon="labels"></span></button>
       <button id="btn-north" title="Reset rotation" aria-label="Reset rotation"><span data-icon="compass"></span></button>
+      <button id="btn-sound" class="on" title="Turn off sound and haptics" aria-label="Sound and haptics" aria-pressed="true" data-sound="none"><span data-icon="soundOn"></span></button>
     </div>
     <div class="ctrl-group clay">
       <button id="btn-fit" title="Zoom to all clients" aria-label="Zoom to all clients"><span data-icon="fit"></span></button>
@@ -179,7 +180,7 @@
 
     <div class="sheet-foot">
       <button type="button" class="btn btn-cream" id="btn-cancel">Cancel</button>
-      <button type="submit" form="client-form" class="btn btn-red" id="btn-save">Save client</button>
+      <button type="submit" form="client-form" class="btn btn-red" id="btn-save" data-sound="none">Save client</button>
     </div>
   </section>
 

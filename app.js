@@ -35,6 +35,8 @@
     download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
     upload: '<path d="M12 16V5M7 10l5-5 5 5M5 20h14"/>',
     chevronLeft: '<path d="m15 6-6 6 6 6"/>',
+    soundOn: '<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.2 6.5a8 8 0 0 1 0 11"/>',
+    soundOff: '<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/>',
     list: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
     crosshair: '<circle cx="12" cy="12" r="7.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
   };
@@ -140,6 +142,120 @@
     toastTimer = setTimeout(() => el.classList.remove("show"), 3000);
   }
 
+  /* ------------------------------------------------------------------ sound & haptics */
+
+  // Soft clay-like UI sounds synthesised with Web Audio (no audio files), plus a
+  // matching vibration: navigator.vibrate on Android, the native switch tap on iOS 18+.
+  const feedback = (() => {
+    const PREF_KEY = `${STORAGE_KEY}/feedback`;
+    let on = true;
+    try { on = localStorage.getItem(PREF_KEY) !== "off"; } catch { /* default on */ }
+
+    let ac = null;
+    let master = null;
+    let noise = null;
+
+    function audio() {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      if (!ac) {
+        ac = new AC();
+        master = ac.createGain();
+        master.gain.value = 0.55;
+        const warm = ac.createBiquadFilter();
+        warm.type = "lowpass";
+        warm.frequency.value = 5200;
+        master.connect(warm).connect(ac.destination);
+        noise = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.05), ac.sampleRate);
+        const ch = noise.getChannelData(0);
+        for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+      }
+      if (ac.state === "suspended") ac.resume();
+      return ac;
+    }
+
+    function envelope(gainNode, t, attack, peak, decay) {
+      gainNode.gain.setValueAtTime(0.0001, t);
+      gainNode.gain.exponentialRampToValueAtTime(peak, t + attack);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    }
+
+    function tone({ type = "sine", from, to, at = 0, attack = 0.004, decay = 0.08, gain = 0.12 }) {
+      const t = ac.currentTime + at;
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(from, t);
+      if (to) osc.frequency.exponentialRampToValueAtTime(to, t + attack + decay);
+      envelope(g, t, attack, gain, decay);
+      osc.connect(g).connect(master);
+      osc.start(t);
+      osc.stop(t + attack + decay + 0.03);
+    }
+
+    function tick({ at = 0, freq = 2400, gain = 0.2, decay = 0.02 }) {
+      const t = ac.currentTime + at;
+      const src = ac.createBufferSource();
+      const band = ac.createBiquadFilter();
+      const g = ac.createGain();
+      src.buffer = noise;
+      band.type = "bandpass";
+      band.frequency.value = freq;
+      band.Q.value = 1.4;
+      envelope(g, t, 0.002, gain, decay);
+      src.connect(band).connect(g).connect(master);
+      src.start(t);
+      src.stop(t + 0.05);
+    }
+
+    const SOUNDS = {
+      tap: () => { tick({ freq: 2600, gain: 0.16 }); tone({ from: 880, to: 520, decay: 0.045, gain: 0.04 }); },
+      pop: () => { tone({ from: 640, to: 230, attack: 0.003, decay: 0.12, gain: 0.15 }); tick({ freq: 1700, gain: 0.08 }); },
+      success: () => {
+        tone({ from: 520, to: 250, attack: 0.003, decay: 0.1, gain: 0.12 });
+        tone({ type: "triangle", from: 784, at: 0.08, decay: 0.16, gain: 0.07 });
+        tone({ type: "triangle", from: 1175, at: 0.16, decay: 0.3, gain: 0.06 });
+      },
+      remove: () => { tone({ from: 320, to: 110, attack: 0.004, decay: 0.2, gain: 0.16 }); tick({ freq: 900, gain: 0.08, decay: 0.04 }); },
+      error: () => { tone({ type: "triangle", from: 240, decay: 0.06, gain: 0.08 }); tone({ type: "triangle", from: 200, at: 0.09, decay: 0.09, gain: 0.08 }); },
+      toggle: () => { tick({ freq: 3000, gain: 0.12 }); tone({ from: 700, to: 980, decay: 0.06, gain: 0.05 }); },
+    };
+    const VIBES = { tap: 8, pop: 14, success: [12, 70, 22], remove: 28, error: [18, 50, 18], toggle: 10 };
+
+    // iOS Safari has no vibrate(), but tapping a native switch gives a system haptic
+    let iosSwitch = null;
+    function iosHaptic() {
+      if (!iosSwitch) {
+        iosSwitch = document.createElement("label");
+        iosSwitch.className = "haptic-switch";
+        iosSwitch.setAttribute("aria-hidden", "true");
+        iosSwitch.innerHTML = '<input type="checkbox" switch tabindex="-1" />';
+        document.body.appendChild(iosSwitch);
+      }
+      iosSwitch.click();
+    }
+    const touch = window.matchMedia("(pointer: coarse)").matches;
+
+    function play(name) {
+      if (!on || !SOUNDS[name]) return;
+      try {
+        if (audio()) SOUNDS[name]();
+      } catch { /* audio is a nicety */ }
+      try {
+        if (typeof navigator.vibrate === "function") navigator.vibrate(VIBES[name]);
+        else if (touch) iosHaptic();
+      } catch { /* haptics are a nicety */ }
+    }
+
+    function setOn(value) {
+      on = value;
+      try { localStorage.setItem(PREF_KEY, on ? "on" : "off"); } catch { /* session only */ }
+      if (on) play("toggle");
+    }
+
+    return { play, setOn, get on() { return on; } };
+  })();
+
   function matchesFilter(c) {
     if (!state.filter) return true;
     const l = c.location;
@@ -184,6 +300,7 @@
         const b = document.createElement("button");
         b.className = `btn ${a.kind === "red" ? "btn-red" : a.kind === "ink" ? "btn-ink" : "btn-cream"}`;
         b.textContent = a.label;
+        if (a.silent) b.dataset.sound = "none";
         b.addEventListener("click", () => finish(a.value));
         box.appendChild(b);
       });
@@ -329,6 +446,8 @@
       el.setAttribute("aria-label", list.map((c) => c.company).join(", "));
       el.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (state.picking) return pickAt(marker.getLngLat()); // adding a client at an existing pin's spot
+        feedback.play("pop");
         openGroupPopup(key);
       });
 
@@ -710,9 +829,10 @@
     const ok = await ask({
       title: `Remove ${client.company}?`,
       text: "Their pin will be taken off the map. You can add them again at any time.",
-      actions: [{ label: "Keep", value: false }, { label: "Remove", value: true, kind: "red" }],
+      actions: [{ label: "Keep", value: false }, { label: "Remove", value: true, kind: "red", silent: true }],
     });
     if (!ok) return;
+    feedback.play("remove");
     state.clients = state.clients.filter((c) => c.id !== client.id);
     if (state.popup) state.popup.remove();
     const saved = saveClients();
@@ -758,6 +878,7 @@
       incoming = (Array.isArray(data) ? data : data.clients || []).filter(isValidClient);
       if (!incoming.length) throw new Error("empty");
     } catch {
+      feedback.play("error");
       toast("That file isn't a client map backup");
       return;
     }
@@ -780,7 +901,10 @@
     const saved = saveClients();
     renderAll();
     fitAllClients();
-    if (saved) toast(`Imported ${incoming.length} clients`);
+    if (saved) {
+      feedback.play("success");
+      toast(`Imported ${incoming.length} clients`);
+    }
   });
 
   /* ------------------------------------------------------------------ add / edit sheet */
@@ -833,11 +957,13 @@
     $("f-company").closest(".field").classList.toggle("invalid", !company);
     $("f-loc").closest(".field").classList.toggle("invalid", !state.draftLocation);
     if (!company) {
+      feedback.play("error");
       $("f-company").focus();
       toast("Add the company name");
       return;
     }
     if (!state.draftLocation) {
+      feedback.play("error");
       $("f-loc").focus();
       toast("Choose where the client is: search for it or click the map");
       return;
@@ -864,6 +990,7 @@
     else state.clients.push(record);
     if (record.isHQ) enforceSingleHQ(record.id);
     const saved = saveClients();
+    feedback.play(saved ? "success" : "error");
 
     closeSheet();
     if (!matchesFilter(record)) setFilter("");
@@ -1072,9 +1199,13 @@
     $("sheet").classList.remove("away");
   }
 
-  map.on("click", async (e) => {
-    if (!state.picking) return;
-    const { lat, lng } = e.lngLat.wrap();
+  map.on("click", (e) => {
+    if (state.picking) pickAt(e.lngLat);
+  });
+
+  async function pickAt(lngLat) {
+    feedback.play("pop");
+    const { lat, lng } = lngLat.wrap();
     stopPicking();
     let loc = {
       title: "Selected spot", name: "", city: "", region: "", display: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
@@ -1091,6 +1222,30 @@
       $("loc-spinner").hidden = true;
     }
     useLocation(loc, { picked: true });
+  }
+
+  /* ------------------------------------------------------------------ sound & haptics wiring */
+
+  // One soft tap for buttons, cards and search results; specific actions play their own sound
+  document.addEventListener("click", (e) => {
+    const el = e.target.closest("button, .card[data-id], .loc-results li[data-i]");
+    if (!el || el.dataset.sound === "none" || el.closest(".pin")) return;
+    feedback.play("tap");
+  }, true);
+
+  $("f-hq").addEventListener("change", () => feedback.play("toggle"));
+
+  function renderSoundButton() {
+    const btn = $("btn-sound");
+    btn.innerHTML = icon(feedback.on ? "soundOn" : "soundOff");
+    btn.classList.toggle("on", feedback.on);
+    btn.setAttribute("aria-pressed", String(feedback.on));
+    btn.title = feedback.on ? "Turn off sound and haptics" : "Turn on sound and haptics";
+  }
+  $("btn-sound").addEventListener("click", () => {
+    feedback.setOn(!feedback.on);
+    renderSoundButton();
+    toast(feedback.on ? "Sound and haptics on" : "Sound and haptics off");
   });
 
   /* ------------------------------------------------------------------ keyboard */
@@ -1110,10 +1265,11 @@
   /* ------------------------------------------------------------------ boot */
 
   hydrateIcons();
+  renderSoundButton();
   renderList();
   renderStats();
   if (isPhone()) setPanelCollapsed(true);
 
   // Read-only handle for automated checks: open the page with ?qa
-  if (new URLSearchParams(location.search).has("qa")) window.__ethixwebQA = { map, state };
+  if (new URLSearchParams(location.search).has("qa")) window.__ethixwebQA = { map, state, feedback };
 })();

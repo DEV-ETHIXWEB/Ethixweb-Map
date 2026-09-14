@@ -64,6 +64,8 @@ body {
 button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; background: none; border: 0; padding: 0; }
 .svg-defs { position: absolute; }
+/* Off-screen native switch used only to trigger iOS haptics */
+.haptic-switch { position: fixed; left: -200px; top: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
 
 .ico { width: 18px; height: 18px; flex: none; display: block; }
 [data-icon] { display: inline-flex; }
