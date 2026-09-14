@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="glow" cx="100%" cy="0%" r="80%">
+      <stop offset="0" stop-color="#C1272D" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#7A1418" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#7A1418" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0%" cy="100%" r="60%">
+      <stop offset="0" stop-color="#9E1D22" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#9E1D22" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tile"><rect width="64" height="64" rx="14"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="64" height="64" fill="#080506"/>
+    <rect width="64" height="64" fill="url(#glow)"/>
+    <rect width="64" height="64" fill="url(#glow2)"/>
+    <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.12"/>
+  </g>
+  <!-- The bar-built E from the ETHIXWEB wordmark, snapped to a 4-unit grid (1px at 16px) -->
+  <g fill="#FFFFFF">
+    <rect x="16" y="12" width="32" height="8" rx="2"/>
+    <rect x="16" y="28" width="24" height="8" rx="2"/>
+    <rect x="16" y="44" width="32" height="8" rx="2"/>
+  </g>
+</svg>

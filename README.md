@@ -30,6 +30,9 @@ Then open http://localhost:5173. You need an internet connection for the imagery
 | `app.js` | Map, pins, search, add, edit and remove |
 | `data/clients.js` | The client list that ships with the map |
 | `assets/ethixweb-logo.png` | Web-sized copy of `ethixweb-wordmark-red-print.png` |
+| `assets/favicon/` | Browser tab and home-screen icons. `favicon.svg` is the source; the PNGs are rendered from it |
+| `assets/og-image.jpg` | Preview image shown when the link is shared, made from `Ethixweb_og.png` |
+| `site.webmanifest` | App name and icons for "Add to Home Screen" |
 
 Changes made in the app are saved in that browser. A new entry added to `data/clients.js` shows up for everyone the next time they open the map.
 
