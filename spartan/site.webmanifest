@@ -1,0 +1,13 @@
+{
+  "name": "Spartan Management Group · Our Locations",
+  "short_name": "Spartan Locations",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0A0F17",
+  "theme_color": "#0058AC",
+  "icons": [
+    { "src": "assets/favicon/favicon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/favicon/favicon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/favicon/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

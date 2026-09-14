@@ -1,0 +1,72 @@
+/* ==========================================================================
+   Spartan Management Group edition
+   Colours from spartanmg.net and the Spartan logo:
+   logo blue #0058AC · site blue #1470AF · light blue #8EB6DC · helmet red #AC0000 / #D22929
+   Font: Poppins (as on spartanmg.net)
+   ========================================================================== */
+
+:root {
+  --accent: #0058ac;
+  --accent-hi: #2f82c9;
+  --accent-lo: #004b94;
+  --accent-deep: #003d78;
+  --accent-tint: #fbe3e3;
+  --accent-rgb: 0, 88, 172;
+  --accent-shadow-rgb: 0, 28, 64;
+
+  --paper: #ffffff;
+  --paper-2: #fbfdff;
+  --paper-3: #f4f8fc;
+  --surface: #edf3f9;
+  --surface-2: #dde8f3;
+  --surface-3: #c4d6e9;
+
+  --ink: #1b2533;
+  --ink-2: #3e4b5c;
+  --ink-hi: #34425a;
+  --ink-rgb: 27, 37, 51;
+  --muted: #6a7a8e;
+  --placeholder: #93a3b6;
+
+  --line-rgb: 40, 60, 90;
+  --shade-rgb: 60, 90, 130;
+  --shadow-rgb: 14, 34, 64;
+  --glass-rgb: 248, 251, 255;
+  --space: #0a0f17;
+
+  /* Business pins in Spartan helmet red, headquarters pin in Spartan blue */
+  --pin-hi: #e65252;
+  --pin: #c41e1e;
+  --pin-deep: #7a0000;
+  --hq-hi: #4c95d6;
+  --hq: #0058ac;
+  --hq-deep: #002f5e;
+  --hq-dot: #d22929;
+  --pin-core-hi: #ffffff;
+  --pin-core: #dce6f1;
+
+  --font: "Poppins", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Poppins has no width axis; tune the display type to suit it */
+.topbar-title { font-weight: 600; letter-spacing: -0.005em; }
+.panel-head h2, .sheet-head h2, .empty h3, .modal-card h3 { font-weight: 600; letter-spacing: -0.01em; }
+.pop-item h3 { font-weight: 600; font-size: 16px; }
+.card-title { font-weight: 600; font-size: 14.5px; }
+.stat b { font-weight: 600; }
+
+/* Wider brand chip for the stacked Spartan lockup */
+.brand { height: 56px; padding: 0 14px; }
+.brand img { height: 44px; }
+
+/* Office/HQ tag in Spartan blue; the red "remove" hover keeps the helmet red */
+.tag-hq { background: var(--accent); color: #fff; }
+.card-actions button[data-action="delete"]:hover { color: #c41e1e; background: #fbe3e3; }
+.pop-actions .danger { color: #c41e1e; }
+.field-label em { color: #c41e1e; }
+.eyebrow { color: #c41e1e; }
+.list-section { color: var(--accent); }
+
+@media (max-width: 760px) {
+  .brand img { height: 28px; }
+}

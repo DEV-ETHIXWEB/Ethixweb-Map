@@ -5,7 +5,25 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "ethixweb-client-map/v1";
+  // Edition settings. index.html runs with these defaults (Ethixweb); another edition
+  // (e.g. spartan/index.html) sets window.MAP_CONFIG and window.MAP_DATA before this file.
+  const CONFIG = {
+    brand: "Ethixweb",
+    storageKey: "ethixweb-client-map/v1",
+    exportName: "ethixweb-clients",
+    noun: { one: "client", many: "clients" },
+    scope: { key: "country", one: "country", many: "countries" }, // third stat + subtitle
+    officeLabel: "Office",
+    initialView: "world", // "world" or "fit" (zoom to the businesses)
+    sections: null, // optional [{ name, regions: [...] }] to group the list
+    colors: { area: "#C1272D", areaHalo: "#FFFDF9", preview: "#F3EBDD", arc: "#FFFDF9", pulse: "#C1272D" },
+    ...(window.MAP_CONFIG || {}),
+  };
+  CONFIG.colors = { area: "#C1272D", areaHalo: "#FFFDF9", preview: "#F3EBDD", arc: "#FFFDF9", pulse: "#C1272D", ...(window.MAP_CONFIG?.colors || {}) };
+  const STORAGE_KEY = CONFIG.storageKey;
+  const SHIPPED = window.MAP_DATA || window.ETHIXWEB_CLIENTS || [];
+  const nounFor = (n) => (n === 1 ? CONFIG.noun.one : CONFIG.noun.many);
+  const scopeFor = (n) => (n === 1 ? CONFIG.scope.one : CONFIG.scope.many);
   const SEEDED_KEY = `${STORAGE_KEY}/seeded`;
   const NOMINATIM = "https://nominatim.openstreetmap.org";
   const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
@@ -46,8 +64,8 @@
     root.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = icon(el.dataset.icon); });
 
   const PIN_PATH = "M20 50.5c-1 0-1.9-.6-2.6-1.6L6.6 33A18.5 18.5 0 1 1 33.4 33L22.6 48.9c-.7 1-1.6 1.6-2.6 1.6z";
-  const pinSvg = (fill = "pin-red", cls = "") =>
-    `<svg class="${cls}" viewBox="0 0 40 52" aria-hidden="true"><path d="${PIN_PATH}" fill="url(#${fill})"/><path d="${PIN_PATH}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1"/><circle cx="20" cy="19.5" r="7" fill="url(#pin-cream)"/>${fill === "pin-ink" ? '<circle cx="20" cy="19.5" r="3.2" fill="#C1272D"/>' : ""}</svg>`;
+  const pinSvg = (fill = "pin-main", cls = "") =>
+    `<svg class="${cls}" viewBox="0 0 40 52" aria-hidden="true"><path d="${PIN_PATH}" fill="url(#${fill})"/><path d="${PIN_PATH}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1"/><circle cx="20" cy="19.5" r="7" fill="url(#pin-core)"/>${fill === "pin-hq" ? '<circle cx="20" cy="19.5" r="3.2" style="fill: var(--hq-dot)"/>' : ""}</svg>`;
 
   /* ------------------------------------------------------------------ state & storage */
 
@@ -78,7 +96,7 @@
       seeded = JSON.parse(localStorage.getItem(SEEDED_KEY) || "[]");
     } catch { /* storage unavailable: use the shipped list */ }
 
-    const shipped = (Array.isArray(window.ETHIXWEB_CLIENTS) ? window.ETHIXWEB_CLIENTS : []).filter(isValidClient);
+    const shipped = (Array.isArray(SHIPPED) ? SHIPPED : []).filter(isValidClient);
     const known = new Set(clients.map((c) => c.id));
     const fresh = shipped.filter((c) => !seeded.includes(c.id) && !known.has(c.id));
     if (fresh.length) {
@@ -131,6 +149,8 @@
       return "";
     }
   }
+  // Logos may come from imported files, so only allow local assets or https images
+  const safeImg = (u) => (typeof u === "string" && /^(assets\/|\.{1,2}\/|https:\/\/)[^\s"'<>]+$/i.test(u) ? u : "");
   const prettyUrl = (u) => u.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
 
   let toastTimer;
@@ -268,14 +288,14 @@
     const gap = 16;
     if (isPhone()) {
       const panelH = $("panel").getBoundingClientRect().height;
-      return { top: 90, bottom: panelH + 40, left: 40, right: 60 };
+      return { top: 90, bottom: panelH + 40, left: 40, right: 84 };
     }
     const panelOpen = !$("panel").classList.contains("collapsed");
     const sheetOpen = $("sheet").classList.contains("open");
     return {
       top: 72 + gap * 2 + 30,
       bottom: 50,
-      left: panelOpen ? 360 + gap * 2 + 30 : 60,
+      left: panelOpen ? 360 + gap * 2 + 70 : 70,
       right: sheetOpen ? 420 + gap * 2 + 40 : 90,
     };
   }
@@ -298,7 +318,7 @@
       };
       actions.forEach((a) => {
         const b = document.createElement("button");
-        b.className = `btn ${a.kind === "red" ? "btn-red" : a.kind === "ink" ? "btn-ink" : "btn-cream"}`;
+        b.className = `btn ${a.kind === "primary" ? "btn-primary" : a.kind === "ink" ? "btn-ink" : "btn-soft"}`;
         b.textContent = a.label;
         if (a.silent) b.dataset.sound = "none";
         b.addEventListener("click", () => finish(a.value));
@@ -367,7 +387,8 @@
   map.on("load", () => {
     addDataLayers();
     renderAll();
-    map.jumpTo({ center: worldCenter(), zoom: worldZoom(), padding: mapPadding() });
+    if (CONFIG.initialView === "fit" && state.clients.length > 1) fitAllClients({ duration: 0 });
+    else map.jumpTo({ center: worldCenter(), zoom: worldZoom(), padding: mapPadding() });
   });
 
   const emptyFC = () => ({ type: "FeatureCollection", features: [] });
@@ -376,21 +397,21 @@
     // Client city areas sit under the place names so labels stay readable
     map.addSource("areas", { type: "geojson", data: emptyFC() });
     map.addLayer({ id: "areas-fill", type: "fill", source: "areas",
-      paint: { "fill-color": "#C1272D", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 4, 0.35, 12, 0.18] } }, "places");
+      paint: { "fill-color": CONFIG.colors.area, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 4, 0.35, 12, 0.18] } }, "places");
     map.addLayer({ id: "areas-halo", type: "line", source: "areas",
       layout: { "line-join": "round" },
-      paint: { "line-color": "#FFFDF9", "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.5, 12, 5], "line-opacity": 0.55, "line-blur": 1 } }, "places");
+      paint: { "line-color": CONFIG.colors.areaHalo, "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.5, 12, 5], "line-opacity": 0.55, "line-blur": 1 } }, "places");
     map.addLayer({ id: "areas-line", type: "line", source: "areas",
       layout: { "line-join": "round" },
-      paint: { "line-color": "#C1272D", "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1, 12, 2.5] } }, "places");
+      paint: { "line-color": CONFIG.colors.area, "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1, 12, 2.5] } }, "places");
 
     map.addSource("preview-area", { type: "geojson", data: emptyFC() });
     map.addLayer({ id: "preview-fill", type: "fill", source: "preview-area",
-      paint: { "fill-color": "#F3EBDD", "fill-opacity": 0.16 } }, "places");
+      paint: { "fill-color": CONFIG.colors.preview, "fill-opacity": 0.16 } }, "places");
     map.addLayer({ id: "preview-line", type: "line", source: "preview-area",
-      paint: { "line-color": "#FFFDF9", "line-width": 2.2, "line-dasharray": [2, 1.5] } }, "places");
+      paint: { "line-color": CONFIG.colors.areaHalo, "line-width": 2.2, "line-dasharray": [2, 1.5] } }, "places");
 
-    // Lines from an Ethixweb office to each client
+    // Lines from the office / headquarters to each location
     const fade = (max) => ["interpolate", ["linear"], ["zoom"], 5, max, 8, 0];
     map.addSource("arcs", { type: "geojson", data: emptyFC() });
     map.addLayer({ id: "arcs-shadow", type: "line", source: "arcs",
@@ -398,10 +419,10 @@
       paint: { "line-color": "#000", "line-width": 3.5, "line-blur": 2, "line-opacity": fade(0.35), "line-translate": [0, 2] } });
     map.addLayer({ id: "arcs-line", type: "line", source: "arcs",
       layout: { "line-cap": "round" },
-      paint: { "line-color": "#FFFDF9", "line-width": 1.6, "line-opacity": fade(0.9), "line-dasharray": [3, 2] } });
+      paint: { "line-color": CONFIG.colors.arc, "line-width": 1.6, "line-opacity": fade(0.9), "line-dasharray": [3, 2] } });
     map.addSource("pulses", { type: "geojson", data: emptyFC() });
     map.addLayer({ id: "pulses", type: "circle", source: "pulses",
-      paint: { "circle-radius": 4, "circle-color": "#C1272D", "circle-stroke-color": "#FFFDF9", "circle-stroke-width": 1.5, "circle-opacity": fade(1), "circle-stroke-opacity": fade(1) } });
+      paint: { "circle-radius": 4, "circle-color": CONFIG.colors.pulse, "circle-stroke-color": CONFIG.colors.arc, "circle-stroke-width": 1.5, "circle-opacity": fade(1), "circle-stroke-opacity": fade(1) } });
   }
 
   /* ------------------------------------------------------------------ rendering */
@@ -438,7 +459,7 @@
       el.innerHTML = `
         <span class="pin-shadow"></span>
         <div class="pin-body">
-          ${pinSvg(lead.isHQ ? "pin-ink" : "pin-red")}
+          ${pinSvg(lead.isHQ ? "pin-hq" : "pin-main")}
           ${list.length > 1 ? `<span class="pin-count">${list.length}</span>` : ""}
         </div>
         <div class="pin-label">${esc(lead.company)}${list.length > 1 ? `<small>+${list.length - 1} more</small>` : ""}</div>`;
@@ -475,6 +496,12 @@
     const c0 = map.getCenter();
     const r = Math.PI / 180;
 
+    // Labels also steer clear of the floating interface (top bar, list, buttons)
+    for (const el of [document.querySelector(".topbar"), $("panel"), $("btn-reopen"), document.querySelector(".controls")]) {
+      if (!el || el.hidden || (el.id === "panel" && el.classList.contains("collapsed") && !isPhone())) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width && r.height) placed.push({ l: r.left - 6, r: r.right + 6, t: r.top - 6, b: r.bottom + 6 });
+    }
     const shown = [];
     for (const m of ordered) {
       if (globe) {
@@ -492,7 +519,8 @@
       placed.push({ l: x - 16, r: x + 16, t: y - 44, b: y }); // every pin blocks labels
     }
 
-    const edgeL = 8;
+    const panel = $("panel");
+    const edgeL = !isPhone() && !panel.classList.contains("collapsed") ? panel.getBoundingClientRect().right + 8 : 8;
     const edgeR = window.innerWidth - 8;
     for (const { m, x, y } of shown) {
       const w = m.el.querySelector(".pin-label").offsetWidth + 6;
@@ -579,13 +607,14 @@
   function renderStats() {
     const clients = state.clients.filter((c) => !c.isHQ);
     const cities = new Set(clients.map((c) => cityKey(c.location))).size;
-    const countries = new Set(clients.map((c) => c.location.countryCode || c.location.country).filter(Boolean)).size;
+    const scopeKey = (l) => (CONFIG.scope.key === "region" ? l.region && `${l.region}|${l.countryCode}` : l.countryCode || l.country);
+    const scopes = new Set(clients.map((c) => scopeKey(c.location)).filter(Boolean)).size;
     $("stat-clients").textContent = clients.length;
     $("stat-cities").textContent = cities;
-    $("stat-countries").textContent = countries;
+    $("stat-countries").textContent = scopes;
     $("topbar-sub").textContent = clients.length
-      ? `${clients.length} ${clients.length === 1 ? "client" : "clients"} in ${countries} ${countries === 1 ? "country" : "countries"}`
-      : "No clients added yet";
+      ? `${clients.length} ${nounFor(clients.length)} in ${scopes} ${scopeFor(scopes)}`
+      : `No ${CONFIG.noun.many} added yet`;
   }
 
   function renderList() {
@@ -594,20 +623,22 @@
       Number(!!b.isHQ) - Number(!!a.isHQ) || a.company.localeCompare(b.company));
 
     $("empty").hidden = state.clients.length > 0;
-    $("list-count").textContent = state.filter ? `${items.length}/${state.clients.length}` : state.clients.length;
+    const countable = (arr) => arr.filter((c) => !c.isHQ).length;
+    $("list-count").textContent = state.filter ? `${countable(items)}/${countable(state.clients)}` : countable(state.clients);
 
     if (state.clients.length && !items.length) {
       list.innerHTML = `<li class="no-match">Nothing matches “${esc(state.filter)}”</li>`;
       return;
     }
 
-    list.innerHTML = items.map((c) => {
+    const card = (c) => {
       const sub = [c.industry, c.client].filter(Boolean).join(" · ");
+      const logo = safeImg(c.logo);
       return `
-      <li class="card${state.activeKey === groupKey(c.location) ? " active" : ""}" data-id="${esc(c.id)}" tabindex="0">
-        ${pinSvg(c.isHQ ? "pin-ink" : "pin-red", "card-mark")}
+      <li class="card${state.activeKey === groupKey(c.location) ? " active" : ""}${logo ? " has-logo" : ""}" data-id="${esc(c.id)}" tabindex="0">
+        ${logo ? `<span class="card-logo"><img src="${esc(logo)}" alt="" loading="lazy" /></span>` : pinSvg(c.isHQ ? "pin-hq" : "pin-main", "card-mark")}
         <div class="card-body">
-          <div class="card-title"><span>${esc(c.company)}</span>${c.isHQ ? '<em class="tag-hq">Office</em>' : ""}</div>
+          <div class="card-title"><span>${esc(c.company)}</span>${c.isHQ ? `<em class="tag-hq">${esc(CONFIG.officeLabel)}</em>` : ""}</div>
           ${sub ? `<div class="card-sub">${esc(sub)}</div>` : ""}
           <div class="card-loc"><span class="place">${esc(placeLabel(c.location))}</span>${c.location.countryCode ? `<span class="cc">${esc(c.location.countryCode)}</span>` : ""}</div>
         </div>
@@ -616,7 +647,38 @@
           <button data-action="delete" data-id="${esc(c.id)}" title="Remove" aria-label="Remove ${esc(c.company)}">${icon("trash")}</button>
         </div>
       </li>`;
-    }).join("");
+    };
+
+    if (!CONFIG.sections) {
+      list.innerHTML = items.map(card).join("");
+      return;
+    }
+    // Grouped like the brand's own locations page: office first, then each section by state
+    const sectionOf = (c) => CONFIG.sections.find((sec) => sec.regions.includes(c.location.region));
+    const order = (c) => {
+      const sec = sectionOf(c);
+      return sec ? CONFIG.sections.indexOf(sec) * 100 + sec.regions.indexOf(c.location.region) : 9999;
+    };
+    const offices = items.filter((c) => c.isHQ);
+    const rest = items.filter((c) => !c.isHQ).sort((a, b) => order(a) - order(b) || a.company.localeCompare(b.company));
+    let html = offices.map(card).join("");
+    let lastSection;
+    let lastRegion;
+    for (const c of rest) {
+      const sec = sectionOf(c);
+      const name = sec ? sec.name : `More ${CONFIG.noun.many}`;
+      if (name !== lastSection) {
+        html += `<li class="list-section" aria-hidden="true"><span>${esc(name)}</span></li>`;
+        lastSection = name;
+        lastRegion = undefined;
+      }
+      if (sec && c.location.region !== lastRegion) {
+        html += `<li class="list-region" aria-hidden="true">${esc(c.location.region)}</li>`;
+        lastRegion = c.location.region;
+      }
+      html += card(c);
+    }
+    list.innerHTML = html;
   }
 
   /* ------------------------------------------------------------------ popup & focus */
@@ -640,9 +702,11 @@
       <div class="pop-items">
         ${list.map((c) => {
           const url = safeUrl(c.website);
-          const tags = [c.isHQ ? '<span class="tag-hq">Office</span>' : "", c.industry && `<span>${esc(c.industry)}</span>`, c.since && `<span>Since ${esc(c.since)}</span>`].filter(Boolean).join("");
+          const logo = safeImg(c.logo);
+          const tags = [c.isHQ ? `<span class="tag-hq">${esc(CONFIG.officeLabel)}</span>` : "", c.industry && `<span>${esc(c.industry)}</span>`, c.since && `<span>Since ${esc(c.since)}</span>`].filter(Boolean).join("");
           return `
           <article class="pop-item">
+            ${logo ? `<div class="pop-logo"><img src="${esc(logo)}" alt="${esc(c.company)} logo" /></div>` : ""}
             <h3>${esc(c.company)}</h3>
             ${c.client ? `<div class="pop-contact">${esc(c.client)}</div>` : ""}
             ${c.location.display ? `<div class="pop-address">${esc(c.location.display)}</div>` : ""}
@@ -653,8 +717,8 @@
             </div>` : ""}
             ${c.notes ? `<p class="pop-notes">${esc(c.notes)}</p>` : ""}
             <div class="pop-actions">
-              <button class="btn btn-cream btn-sm" data-action="edit" data-id="${esc(c.id)}">${icon("edit")}Edit</button>
-              <button class="btn btn-cream btn-sm danger" data-action="delete" data-id="${esc(c.id)}">${icon("trash")}Remove</button>
+              <button class="btn btn-soft btn-sm" data-action="edit" data-id="${esc(c.id)}">${icon("edit")}Edit</button>
+              <button class="btn btn-soft btn-sm danger" data-action="delete" data-id="${esc(c.id)}">${icon("trash")}Remove</button>
             </div>
           </article>`;
         }).join("")}
@@ -668,7 +732,7 @@
       state.popup = null;
       setActive(null);
     });
-    requestAnimationFrame(keepPopupInView);
+    requestAnimationFrame(() => requestAnimationFrame(keepPopupInView)); // after the popup has laid out
   }
 
   // Nudge the map so an open popup never hides under the top bar, list or form
@@ -702,7 +766,9 @@
     const padding = mapPadding();
     const bb = loc.bbox; // [south, north, west, east]
     if (loc.geojson && Array.isArray(bb) && bb.length === 4 && bb.every(Number.isFinite)) {
-      map.fitBounds([[bb[2], bb[0]], [bb[3], bb[1]]], { padding, maxZoom: 14, duration, pitch: 0, essential: true });
+      // city area plus the pin itself: some addresses sit just outside the city limits
+      const bounds = new maplibregl.LngLatBounds([bb[2], bb[0]], [bb[3], bb[1]]).extend([loc.lng, loc.lat]);
+      map.fitBounds(bounds, { padding, maxZoom: 14, duration, pitch: 0, essential: true });
     } else {
       map.flyTo({ center: [loc.lng, loc.lat], zoom: 15, padding, duration, essential: true });
     }
@@ -744,7 +810,8 @@
   $("btn-north").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: 0, duration: 600 }));
   $("btn-fit").addEventListener("click", () => fitAllClients());
   $("btn-world").addEventListener("click", goWorld);
-  $("btn-brand").addEventListener("click", goWorld);
+  // The logo returns to the edition's home view: the whole world, or all locations
+  $("btn-brand").addEventListener("click", () => (CONFIG.initialView === "fit" ? fitAllClients() : goWorld()));
 
   $("btn-view").addEventListener("click", () => {
     state.projection = state.projection === "globe" ? "mercator" : "globe";
@@ -829,7 +896,7 @@
     const ok = await ask({
       title: `Remove ${client.company}?`,
       text: "Their pin will be taken off the map. You can add them again at any time.",
-      actions: [{ label: "Keep", value: false }, { label: "Remove", value: true, kind: "red", silent: true }],
+      actions: [{ label: "Keep", value: false }, { label: "Remove", value: true, kind: "primary", silent: true }],
     });
     if (!ok) return;
     feedback.play("remove");
@@ -855,16 +922,16 @@
   /* ------------------------------------------------------------------ backup */
 
   $("btn-export").addEventListener("click", () => {
-    const payload = { app: "ethixweb-client-map", version: 1, exportedAt: new Date().toISOString(), clients: state.clients };
+    const payload = { app: CONFIG.storageKey.replace(/\/v\d+$/, ""), version: 1, exportedAt: new Date().toISOString(), clients: state.clients };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `ethixweb-clients-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `${CONFIG.exportName}-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1500);
-    toast(`Downloaded a backup of ${state.clients.length} clients`);
+    toast(`Downloaded a backup of ${state.clients.length} ${nounFor(state.clients.length)}`);
   });
 
   $("btn-import").addEventListener("click", () => $("import-file").click());
@@ -879,15 +946,15 @@
       if (!incoming.length) throw new Error("empty");
     } catch {
       feedback.play("error");
-      toast("That file isn't a client map backup");
+      toast("That file isn't a map backup");
       return;
     }
     let mode = "replace";
     if (state.clients.length) {
       mode = await ask({
-        title: `Import ${incoming.length} clients`,
-        text: "Add them to the clients already on the map, or replace the map with this file?",
-        actions: [{ label: "Cancel", value: null }, { label: "Replace", value: "replace", kind: "ink" }, { label: "Add to map", value: "merge", kind: "red" }],
+        title: `Import ${incoming.length} ${nounFor(incoming.length)}`,
+        text: `Add them to the ${CONFIG.noun.many} already on the map, or replace the map with this file?`,
+        actions: [{ label: "Cancel", value: null }, { label: "Replace", value: "replace", kind: "ink" }, { label: "Add to map", value: "merge", kind: "primary" }],
       });
       if (!mode) return;
     }
@@ -903,7 +970,7 @@
     fitAllClients();
     if (saved) {
       feedback.play("success");
-      toast(`Imported ${incoming.length} clients`);
+      toast(`Imported ${incoming.length} ${nounFor(incoming.length)}`);
     }
   });
 
@@ -914,9 +981,9 @@
     state.editingId = client?.id || null;
     state.draftLocation = client ? client.location : null;
 
-    $("sheet-eyebrow").textContent = client ? "Edit client" : "New client";
-    $("sheet-title").textContent = client ? client.company : "Add a client";
-    $("btn-save").textContent = client ? "Save changes" : "Save client";
+    $("sheet-eyebrow").textContent = client ? `Edit ${CONFIG.noun.one}` : `New ${CONFIG.noun.one}`;
+    $("sheet-title").textContent = client ? client.company : `Add a ${CONFIG.noun.one}`;
+    $("btn-save").textContent = client ? "Save changes" : `Save ${CONFIG.noun.one}`;
     $("f-company").value = client?.company || "";
     $("f-client").value = client?.client || "";
     $("f-industry").value = client?.industry || "";
@@ -965,7 +1032,7 @@
     if (!state.draftLocation) {
       feedback.play("error");
       $("f-loc").focus();
-      toast("Choose where the client is: search for it or click the map");
+      toast(`Choose where the ${CONFIG.noun.one} is: search for it or click the map`);
       return;
     }
 
@@ -1156,7 +1223,7 @@
     box.hidden = !loc;
     if (!loc) return;
     box.innerHTML = `
-      ${pinSvg("pin-red", "mini-pin")}
+      ${pinSvg("pin-main", "mini-pin")}
       <div>
         <div class="ls-name">${esc(placeLabel(loc) || loc.title || "Selected spot")}</div>
         <div class="ls-sub">${esc(loc.display)}</div>
@@ -1169,7 +1236,7 @@
     map.getSource("preview-area")?.setData(loc.geojson ? { type: "Feature", properties: {}, geometry: loc.geojson } : emptyFC());
     const el = document.createElement("div");
     el.className = "pin preview";
-    el.innerHTML = `<span class="pin-shadow"></span><div class="pin-body">${pinSvg("pin-red")}</div>`;
+    el.innerHTML = `<span class="pin-shadow"></span><div class="pin-body">${pinSvg("pin-main")}</div>`;
     state.previewMarker = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([loc.lng, loc.lat]).addTo(map);
     if (move) focusLocation(loc, { duration: 2000 });
   }
@@ -1271,5 +1338,5 @@
   if (isPhone()) setPanelCollapsed(true);
 
   // Read-only handle for automated checks: open the page with ?qa
-  if (new URLSearchParams(location.search).has("qa")) window.__ethixwebQA = { map, state, feedback };
+  if (new URLSearchParams(location.search).has("qa")) window.__ethixwebQA = { map, state, feedback, config: CONFIG };
 })();
